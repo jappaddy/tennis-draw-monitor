@@ -1,0 +1,55 @@
+name: URL Watch
+
+on:
+  schedule:
+    # 現在登録されている監視対象の最小間隔(30分)に合わせている。
+    # 対象追加でより短い間隔が必要になったら、この式も合わせて変更すること。
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+    inputs:
+      forceRunAll:
+        description: 'check_interval_minutesを無視して全対象を強制チェック'
+        type: boolean
+        default: false
+      targetName:
+        description: '特定の監視対象名のみ実行（空なら全対象）'
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: url-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install -r requirements.txt
+
+      - name: Run watcher
+        env:
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+          FORCE_RUN_ALL: ${{ github.event.inputs.forceRunAll }}
+          TARGET_NAME: ${{ github.event.inputs.targetName }}
+        run: python src/monitor.py
+
+      - name: Commit state changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add state/state.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: update watch state [skip ci]"
+            git push
+          else
+            echo "no state changes"
+          fi

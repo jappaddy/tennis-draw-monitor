@@ -1,0 +1,14 @@
+{
+  "monitors": [
+    {
+      "name": "秋季ジュニアリーグテニス大会",
+      "url": "https://s-ta.jp/tournament/r8/8281/",
+      "enabled": true,
+      "check_interval_minutes": 30,
+      "container_selector": "div.entry_items",
+      "item_selector": "li",
+      "text_keywords": ["組", "合", "わ", "せ"],
+      "notification_title": "📋 テニス大会の組み合わせが公開されました！"
+    }
+  ]
+}
