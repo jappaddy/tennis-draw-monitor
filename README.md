@@ -107,6 +107,14 @@ gh run view <run-id> --log
 
 旧バージョン（`has_link`/`link_url`フィールド）のstate.jsonも自動的に新フォーマットへ変換される（`load_state()`が読み込み時にマイグレーションする）。既存の監視対象の動作は変わらない。
 
+### watch_type=link_href は通知後、自動的にチェックを止める
+
+`link_href`方式は「未発表→発表」という一度きりのイベント検知なので、通知が送信されたらその監視対象の`state.json`エントリに`completed: true`が記録され、**以降は`enabled: true`のままでも自動的にスキップされる**（相手サーバーへの無駄なアクセスやGitHub Actionsの無駄な実行を防ぐため）。
+
+もう一度チェックさせたい場合（発表内容が差し替わった場合など）は、`state/state.json`の該当エントリの`completed`を`false`に戻すか、削除する。動作確認等で`completed`を無視して強制的にチェックしたい場合は`workflow_dispatch`の`forceRunAll`（`FORCE_RUN_ALL=true`）を使う。
+
+`selector_hash`/`full_text_hash`方式は継続的な変化を追い続ける用途なので、この「一度きりで停止」の挙動は適用されない（何度でも通知され続ける）。
+
 ## エラー時の挙動
 
 サイトへのアクセスが失敗した場合や、対象要素が見つからなかった場合は、誤って「変化なし」と判定しないよう `signature` を更新しない。エラーは原因別に区別してカウント・通知する：

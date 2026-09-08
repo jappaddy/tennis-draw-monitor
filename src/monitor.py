@@ -41,6 +41,7 @@ def migrate_state_entry(entry):
         entry.setdefault("consecutive_structure_errors", 0)
         entry.setdefault("structure_error_notified", False)
         entry.setdefault("last_error_type", None)
+        entry.setdefault("completed", False)
         return entry
 
     has_link = entry.get("has_link", False)
@@ -55,6 +56,9 @@ def migrate_state_entry(entry):
         "last_error_type": "fetch_error" if entry.get("last_error") else None,
         "error_notified": entry.get("error_notified", False),
         "structure_error_notified": False,
+        # 旧スキーマの時点で既にhas_link=Trueだった場合、その通知は既に送信済みのはずなので
+        # completed扱いにする（移行直後にlink_href方式が再度通知してしまうのを防ぐ）
+        "completed": bool(has_link),
     }
 
 
@@ -249,7 +253,7 @@ def is_due(entry, interval_minutes, force_run_all):
     return elapsed_seconds >= interval_minutes * 60
 
 
-def build_ok_entry(signature):
+def build_ok_entry(signature, completed=False):
     return {
         "initialized": True,
         "last_checked_at": now_iso(),
@@ -260,6 +264,7 @@ def build_ok_entry(signature):
         "last_error_type": None,
         "error_notified": False,
         "structure_error_notified": False,
+        "completed": completed,
     }
 
 
@@ -301,13 +306,18 @@ def check_one(monitor, entry):
         return build_ok_entry(new_signature)
 
     old_signature = entry.get("signature")
-    if has_update(watch_type, old_signature, new_signature):
+    updated = has_update(watch_type, old_signature, new_signature)
+    if updated:
         logger.info(f"[{name}] 更新を検知しました (signature={new_signature})")
         send_line_notification(build_notification_text(monitor, result))
     else:
         logger.info(f"[{name}] 変化なし (signature={new_signature})")
 
-    return build_ok_entry(new_signature)
+    # link_href方式は「未発表→発表」という一度きりのイベント検知なので、
+    # 通知を送ったらこの監視対象はもう役目を終えたとみなし、以降は自動的にチェックをスキップする。
+    # selector_hash/full_text_hashは継続的な変化を追い続ける用途なので対象外。
+    completed = updated and watch_type == "link_href"
+    return build_ok_entry(new_signature, completed=completed)
 
 
 def handle_error(entry, error_message, name, error_type="fetch_error", debug_info=None, watch_type=None):
@@ -323,9 +333,11 @@ def handle_error(entry, error_message, name, error_type="fetch_error", debug_inf
         "last_error_type": None,
         "error_notified": False,
         "structure_error_notified": False,
+        "completed": False,
     }
     base.setdefault("consecutive_structure_errors", 0)
     base.setdefault("structure_error_notified", False)
+    base.setdefault("completed", False)
 
     new_entry = dict(base)
     new_entry["last_error"] = error_message
@@ -383,6 +395,11 @@ def main():
             continue
 
         entry = state.get(name)
+
+        if not force_run_all and entry and entry.get("completed"):
+            logger.info(f"[{name}] 既に完了済み（発表を検知しLINE通知済み）のためスキップします")
+            continue
+
         if not is_due(entry, monitor["check_interval_minutes"], force_run_all):
             logger.info(f"[{name}] チェック間隔未経過のためスキップします")
             continue

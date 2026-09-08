@@ -8,6 +8,7 @@
     "last_error": null,
     "last_error_type": null,
     "error_notified": false,
-    "structure_error_notified": false
+    "structure_error_notified": false,
+    "completed": false
   }
 }
