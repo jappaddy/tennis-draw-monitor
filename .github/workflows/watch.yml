@@ -4,7 +4,9 @@ on:
   schedule:
     # 現在登録されている監視対象の最小間隔(30分)に合わせている。
     # 対象追加でより短い間隔が必要になったら、この式も合わせて変更すること。
-    - cron: '*/30 * * * *'
+    # 分は0/30ではなく7/37にして、GitHub Actions全体が混雑しやすい「ちょうどの分」を避けている
+    # (参考: https://github.com/orgs/community/discussions/147369)
+    - cron: '7,37 * * * *'
   workflow_dispatch:
     inputs:
       forceRunAll:
