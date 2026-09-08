@@ -6,12 +6,22 @@ PCを常時起動しておく必要がなく、GitHub Actions（Publicリポジ�
 
 ## 仕組み
 
-- `config/targets.json` に監視したいページをいくつでも登録できる（URL・チェック間隔・CSSセレクタ・キーワードを個別に設定）
-- 指定したキーワードを含む要素（`<li>組合せ</li>`など）を探し、その中の`<a>`タグに`href`属性が付いたかどうかで「更新」を判定する
-- GitHub Actionsが `cron` で定期実行し、前回チェック時の状態を `state/state.json` に保存（変化があればActionsが自動でコミット）
+- `config/targets.json` に監視したいページをいくつでも登録できる（URL・チェック間隔・検知方式を個別に設定）
+- 検知方式（`watch_type`）は3種類から選べる（後述）
+- GitHub Actionsが `cron` で定期実行し、前回チェック時の状態（`signature`）を `state/state.json` に保存（変化があればActionsが自動でコミット）
 - 差分があった場合のみLINE Messaging APIで通知（初回登録時はbaseline保存のみで通知しない）
 
 ## 監視対象の追加方法
+
+### ウィザードで追加（推奨）
+
+```bash
+python scripts/setup_wizard.py
+```
+
+URLとキーワードを入力するだけで、ページを取得してセレクタ候補を自動検出・提示してくれる。生成された設定は`config/targets.json`に自動追記される（自動コミットはしないので、`git diff`で内容を確認してから手動でコミットすること）。
+
+### 手動で追加
 
 `config/targets.json` の `monitors` 配列に追加する。
 
@@ -21,6 +31,7 @@ PCを常時起動しておく必要がなく、GitHub Actions（Publicリポジ�
   "url": "https://example.com/tournament/",
   "enabled": true,
   "check_interval_minutes": 30,
+  "watch_type": "link_href",
   "container_selector": "div.entry_items",
   "item_selector": "li",
   "text_keywords": ["組", "合", "わ", "せ"],
@@ -28,11 +39,18 @@ PCを常時起動しておく必要がなく、GitHub Actions（Publicリポジ�
 }
 ```
 
-- `container_selector` / `item_selector`: 対象要素を含むコンテナとリストアイテムのCSSセレクタ
-- `text_keywords`: これらの文字のいずれかを含む`item_selector`要素をターゲットとする（配列内はOR条件）
 - `check_interval_minutes`: このURLをチェックする間隔（分）。GitHub Actions側のcron間隔より短くしても、cronの実行タイミングでしか実際にはチェックされない点に注意
+- `watch_type`: 省略時は`link_href`扱い（後方互換）。3種類から選べる：
 
-セレクタの調べ方: ブラウザで対象ページを開き、F12の開発者ツールで要素を右クリック→検査し、HTML構造を確認する。
+| watch_type | 用途 | 追加で必要なフィールド | 通知タイミング |
+|---|---|---|---|
+| `link_href`（デフォルト） | リンクが有効化されたら通知（大会組み合わせ等） | `container_selector`, `item_selector`, `text_keywords` | リンク無し→有りに変化した時 |
+| `selector_hash` | 特定要素のHTML変化を検知（価格・在庫等） | `selector` | 前回と値が変化した時 |
+| `full_text_hash` | ページ全体のテキスト変化を検知 | なし | 前回と値が変化した時 |
+
+`link_href`の`container_selector`/`item_selector`はコンテナとリストアイテムのCSSセレクタ、`text_keywords`はこれらの文字のいずれかを含む`item_selector`要素をターゲットとする（配列内はOR条件）。`selector_hash`の`selector`は監視したい要素1つを指すCSSセレクタ。
+
+セレクタの調べ方: ブラウザで対象ページを開き、F12の開発者ツールで要素を右クリック→検査し、HTML構造を確認する（ウィザードを使えばこの手間は不要）。
 
 ### 対象追加時にcronの間隔を見直す
 
@@ -83,11 +101,19 @@ gh run view <run-id> --log
 
 ## 状態管理について
 
-`state/state.json` は各監視対象の前回チェック結果を保持する。初回登録時はbaselineとして保存されるのみで通知は送られない。2回目以降のチェックで実際に「未発表→発表済み」の変化があった時だけLINE通知される。
+`state/state.json` は各監視対象の前回チェック結果を`signature`（文字列 or null、`watch_type`によらず共通のフォーマット）として保持する。初回登録時はbaselineとして保存されるのみで通知は送られない。2回目以降のチェックで実際に変化があった時だけLINE通知される。
 
-サイトへのアクセスが失敗した場合や、対象要素が見つからなかった場合は、誤って「変化なし」と判定しないよう `has_link` を更新しない。3回連続で失敗すると1度だけ「監視エラー」としてLINE通知する。
+旧バージョン（`has_link`/`link_url`フィールド）のstate.jsonも自動的に新フォーマットへ変換される（`load_state()`が読み込み時にマイグレーションする）。既存の監視対象の動作は変わらない。
+
+## エラー時の挙動
+
+サイトへのアクセスが失敗した場合や、対象要素が見つからなかった場合は、誤って「変化なし」と判定しないよう `signature` を更新しない。エラーは原因別に区別してカウント・通知する：
+
+- **フェッチ失敗**（ネットワーク不調・タイムアウト等）: 3回連続で失敗すると1度だけ「監視エラー」としてLINE通知する（一時的な障害の可能性があるため猶予を持たせている）
+- **構造変化**（`container_selector`/`item_selector`/`selector`に一致する要素が見つからない）: 1回で即座に「構造変化を検知した可能性」として通知する（サイトのリニューアル等でセレクタが合わなくなった場合、早く気づけるようにするため）。通知にはデバッグ情報（見つかったitem数など）が含まれる
 
 ## トラブルシューティング
 
-- **通知が来ない**: `gh run view <run-id> --log` でActionsの実行ログを確認。`container_selector`/`item_selector`/`text_keywords`が現在のHTML構造と合っているか確認する
+- **通知が来ない**: `gh run view <run-id> --log` でActionsの実行ログを確認。`container_selector`/`item_selector`/`text_keywords`/`selector`が現在のHTML構造と合っているか確認する
+- **「構造変化を検知した可能性」の通知が来た**: サイトのHTML構造が変わった可能性が高い。ブラウザの開発者ツールで現在の構造を確認し、`config/targets.json`のセレクタを更新する（`python scripts/setup_wizard.py`で再検出するのが手軽）
 - **cronの実行タイミングがずれる**: GitHub Actionsのscheduled runはbest-effortであり、混雑時は数分〜十数分遅れることがある（公式仕様）
