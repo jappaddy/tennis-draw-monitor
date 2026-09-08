@@ -34,7 +34,7 @@ URLとキーワードを入力するだけで、ページを取得してセレ�
   "watch_type": "link_href",
   "container_selector": "div.entry_items",
   "item_selector": "li",
-  "text_keywords": ["組", "合", "わ", "せ"],
+  "text_keywords": ["組合せ"],
   "notification_title": "📋 更新が公開されました！"
 }
 ```
