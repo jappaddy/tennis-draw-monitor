@@ -8,7 +8,7 @@
       "container_selector": "div.entry_items",
       "item_selector": "li",
       "text_keywords": ["組合せ"],
-      "notification_title": "📋 テニス大会の組み合わせが公開されました！"
+      "notification_title": "📋 {name}の組み合わせが公開されました！"
     }
   ]
 }

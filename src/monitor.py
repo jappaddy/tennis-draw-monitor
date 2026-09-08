@@ -266,6 +266,7 @@ def build_ok_entry(signature):
 def build_notification_text(monitor, result):
     watch_type = monitor.get("watch_type", "link_href")
     title = monitor.get("notification_title", "📋 更新が検出されました！")
+    title = title.replace("{name}", monitor["name"])
     timestamp = datetime.now().strftime("%Y年%m月%d日 %H:%M:%S")
     if watch_type == "link_href":
         return f"{title}\n\n🔗 {result['debug_info'].get('link_url')}\n\n📅 確認日時: {timestamp}"
