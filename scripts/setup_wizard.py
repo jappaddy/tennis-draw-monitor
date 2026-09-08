@@ -19,7 +19,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), "..", "config", "targets.json")
-DEFAULT_INTERVAL_MINUTES = 15  # 現行のcron間隔(.github/workflows/watch.yml)に合わせたデフォルト
+DEFAULT_INTERVAL_MINUTES = 30  # 現行のcron間隔(.github/workflows/watch.yml)に合わせたデフォルト
 
 
 def fetch_html(url):

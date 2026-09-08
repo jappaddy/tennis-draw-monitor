@@ -4,7 +4,7 @@
       "name": "秋季ジュニアリーグテニス大会",
       "url": "https://s-ta.jp/tournament/r8/8281/",
       "enabled": true,
-      "check_interval_minutes": 15,
+      "check_interval_minutes": 30,
       "container_selector": "div.entry_items",
       "item_selector": "li",
       "text_keywords": ["組合せ"],
