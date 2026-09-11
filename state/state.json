@@ -1,14 +1,14 @@
 {
   "秋季ジュニアリーグテニス大会": {
     "initialized": true,
-    "last_checked_at": "2026-09-11T01:00:51.584161+00:00",
-    "signature": null,
+    "last_checked_at": "2026-09-11T05:51:15.236541+00:00",
+    "signature": "https://s-ta.jp/uploads/2025/11/秋季2026HP用ドロー.pdf",
     "consecutive_errors": 0,
     "consecutive_structure_errors": 0,
     "last_error": null,
     "last_error_type": null,
     "error_notified": false,
     "structure_error_notified": false,
-    "completed": false
+    "completed": true
   }
 }
